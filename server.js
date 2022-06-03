@@ -2,12 +2,10 @@ const express = require('express')
 const app = express()
 require('dotenv').config({ path: './config.env' })
 const session = require('express-session')
-const passport = require('passport');
-const LocalStrategy = require('passport-local').Strategy
-
+const res = require('express/lib/response')
+const { passport } = require('./google-strategy')
 const { connect } = require('./schema/connect')
 
-const { model } = require('./schema/schema');
 
 connect()
 
@@ -28,69 +26,30 @@ app.use(session({
 app.use(passport.initialize()); // add ons  !important
 app.use(passport.session())
 
-passport.use(new LocalStrategy( // it is passport middleware
-    function(email, password, done) {
 
-        console.log(email, password)
+app.get('/api/google',
+    passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-        model.findOne({ email }, function(err, user) {
-
-            if (err) { return done(err); }
-            if (!user) { return done(null, false, { message: 'incorrect username' }); }
-            if (!user.password === password) { return done(null, false, { message: 'incorrect password' }); }
-            return done(null, user); //pass it to next middleware if exist 1 arg = error 
-        });
-    }
-));
-
-
-
-passport.serializeUser((user, next) => {
-
-    if (user) {
-        console.log(user.id)
-        return next(null, user.id)
-    } else { return next(null, false) }
-
-});
-passport.deserializeUser((id, next) => {
-
-
-    model.findById(
-        id, (err, user) => {
-            if (err)
-                return next(null, false)
-            else
-                return next(null, user)
-        })
-
-})
-
-
-function auth(req, res, next) {
-    console.log(req.user)
-    req.user ? next() : res.redirect('/')
-}
-
-app.post('/login',
-    passport.authenticate("local", { failureRedirect: "/" }),
+app.get('/api/google/callback',
+    passport.authenticate('google', { failureRedirect: '/fail' }),
     function(req, res) {
-        res.redirect('/dashboard');
+        // Successful authentication, redirect home.
+        res.redirect('/dash');
     });
 
-app.get('/', (req, res) => {
-    res.send('login page')
-})
+function isAuth(req, res, next) {
+    if (req.user) {
+        next()
+    } else {
+        res.send('unauthorized access...!')
+    }
+}
 
-app.get('/dashboard', auth, (req, res) => {
-    res.send('login success')
-})
+app.get('/', (req, res) => res.send('hello llogin page'))
+app.get('/dash', isAuth, (req, res, next) => res.send('you are welcome a valid user ..!' + req.user.name))
+app.get('/fail', (req, res, next) => res.send('you faild to login ...!'))
+app.get('/logout', (req, res) => req.logout(err => !err ? res.redirect('/') : res.send('error', err)))
 
-app.post('/logout', (req, res) => {
-    req.session.destroy();
-    res.send('logout success')
-})
-
-app.listen(5000, () => {
-    console.log('server is running ', 5000)
+app.listen(process.env.PORT, () => {
+    console.log('server is running ', process.env.PORT)
 })

@@ -5,11 +5,13 @@ const schema = mongoose.Schema({
     email: {
         type: String,
         required: true,
+        unique: true
     },
-    password: {
+    name: {
         type: String,
         required: true,
     },
+
 
 
 
